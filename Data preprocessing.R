@@ -11,7 +11,7 @@ message("Reading and filtering raw data...")
 CEX <- read_dta(path_to_raw_data, col_select = c(
   "consumption_nondurables", 
   "total_consumption",      # <--- ADDED THIS
-  "total_income", "assets_0",
+  "total_income", "assets_0", "durables",
   "hh_age", "family_size", "marital", "unemp",
   "region", "year"
 ))
@@ -26,8 +26,21 @@ CEX <- subset(
     !is.na(consumption_nondurables) &
     !is.na(total_consumption) &  # <--- ADDED CHECK
     !is.na(total_income) &
-    !is.na(assets_0)
+    !is.na(assets_0) &
+    !is.na(durables)
 )
+
+# 3. Merge with Annual Non-Durables Index
+# Load the annual index data (ensure the CSV is in your working directory)
+nondurables_index <- read.csv("annual_nondurables_1980_2012.csv")
+
+# Merge the index into the main CEX dataframe
+# We use 'left_join' to keep all CEX rows and match 'year' (CEX) to 'Year' (CSV)
+CEX <- left_join(CEX, nondurables_index, by = c("year" = "Year"))
+
+# Optional: Check if the merge was successful
+message("Data merged. New column 'Average_Index' added.")
+head(CEX)
 
 # Convert to factors
 cols_to_factor <- c("region", "year", "marital")
