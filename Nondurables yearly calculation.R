@@ -12,9 +12,9 @@ data$observation_date <- as.Date(data$observation_date, format = "%Y-%m-%d")
 # 3. Extract Year from the date
 data$Year <- year(data$observation_date)
 
-# 4. Filter for years 1980-2012
+# 4. Filter for years 1977-2013
 filtered_data <- data %>%
-  filter(Year >= 1980 & Year <= 2012)
+  filter(Year >= 1977 & Year <= 2013)
 
 # 5. Calculate the annual average
 annual_averages <- filtered_data %>%
