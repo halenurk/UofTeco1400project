@@ -2,52 +2,70 @@
 # LOCAL PRE-PROCESSING SCRIPT
 # -------------------------------------------------------
 if (!require("pacman")) install.packages("pacman")
-pacman::p_load(haven, dplyr)
+pacman::p_load(haven, dplyr, readr)
 
-# 1. Load Data (Adjust path to where your file is locally)
+# 1. Load Data
+# -------------------------------------------------------
 path_to_raw_data <- "CEX_1980_2012.dta" 
 
-message("Reading and filtering raw data...")
+message("Reading raw data...")
 CEX <- read_dta(path_to_raw_data, col_select = c(
+  "household_id",             
+  "year",
+  "survey_year",
+  "survey_month",             # <--- ADDED for sorting
+  "durables",                 # <--- ADDED for GMM (K_t)
   "consumption_nondurables", 
-  "total_consumption",      # <--- ADDED THIS
-  "total_income", "assets_0", "durables",
-  "hh_age", "family_size", "marital", "unemp",
-  "region", "year"
+  "total_consumption",      
+  "total_income",
+  "assets_0",
+  "hh_age",
+  "family_size",
+  "region",
+  "marital",
+  "unemp"
 ))
 
-# 2. Apply Filters
-# We filter out rows where EITHER consumption measure is missing/zero
-CEX <- subset(
+# 2. Merge with Annual Non-Durables Index (P_D)
+# -------------------------------------------------------
+if(file.exists("annual_nondurables_1980_2012.csv")) {
+  nondurables_index <- read_csv("annual_nondurables_1980_2012.csv", show_col_types = FALSE)
+  
+  # Ensure column types match for join
+  CEX$year <- as.numeric(as.character(CEX$year))
+  nondurables_index$Year <- as.numeric(nondurables_index$Year)
+  
+  CEX <- left_join(CEX, nondurables_index, by = c("year" = "Year"))
+  message("Merged with Non-Durables Index.")
+} else {
+  warning("annual_nondurables_1980_2012.csv not found!")
+}
+
+# 3. Apply Filters
+# -------------------------------------------------------
+# We remove 'assets_0' from filters as it is not in the GMM equation
+CEX_Cleaned <- subset(
   CEX,
   consumption_nondurables > 0 &
-    total_consumption > 0 &      # <--- ADDED FILTER
+    total_consumption > 0 &
     total_income > 0 &
+    durables > 0 &            # <--- ADDED: Log(Durables) requires positive values
+    !is.na(household_id) &
+    !is.na(year) &
+    !is.na(survey_month) &    # <--- ADDED
     !is.na(consumption_nondurables) &
-    !is.na(total_consumption) &  # <--- ADDED CHECK
+    !is.na(total_consumption) &
     !is.na(total_income) &
-    !is.na(assets_0) &
-    !is.na(durables)
+    !is.na(durables)          # <--- ADDED
 )
 
-# 3. Merge with Annual Non-Durables Index
-# Load the annual index data (ensure the CSV is in your working directory)
-nondurables_index <- read.csv("annual_nondurables_1980_2012.csv")
-
-# Merge the index into the main CEX dataframe
-# We use 'left_join' to keep all CEX rows and match 'year' (CEX) to 'Year' (CSV)
-CEX <- left_join(CEX, nondurables_index, by = c("year" = "Year"))
-
-# Optional: Check if the merge was successful
-message("Data merged. New column 'Average_Index' added.")
-head(CEX)
-
-# Convert to factors
+# Convert categorical variables
 cols_to_factor <- c("region", "year", "marital")
-CEX[cols_to_factor] <- lapply(CEX[cols_to_factor], as.factor)
+CEX_Cleaned[cols_to_factor] <- lapply(CEX_Cleaned[cols_to_factor], as.factor)
 
-# 3. Save compressed file
-saveRDS(CEX, "CEX_Cleaned.rds", compress = "xz") 
+# Save
+saveRDS(CEX_Cleaned, "CEX_Cleaned.rds")
+message("Preprocessing complete. File saved as CEX_Cleaned.rds")
 
 # 4. Check size
 file_size_mb <- file.size("CEX_Cleaned.rds") / 10^6
