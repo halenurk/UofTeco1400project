@@ -5,7 +5,6 @@ if (!require("pacman")) install.packages("pacman")
 pacman::p_load(haven, dplyr, readr)
 
 # 1. Load Data
-# -------------------------------------------------------
 path_to_raw_data <- "CEX_1980_2012.dta" 
 
 message("Reading raw data...")
@@ -27,22 +26,22 @@ CEX <- read_dta(path_to_raw_data, col_select = c(
 ))
 
 # 2. Merge with Annual Non-Durables Index (P_D)
-# -------------------------------------------------------
-if(file.exists("annual_nondurables_1980_2012.csv")) {
-  nondurables_index <- read_csv("annual_nondurables_1980_2012.csv", show_col_types = FALSE)
-  
+if(file.exists("annual_price_indices.csv")) {
+  price_data <- read_csv("annual_price_indices.csv", show_col_types = FALSE)
+
   # Ensure column types match for join
   CEX$year <- as.numeric(as.character(CEX$year))
-  nondurables_index$Year <- as.numeric(nondurables_index$Year)
+  price_data$Year <- as.numeric(price_data$Year)
   
-  CEX <- left_join(CEX, nondurables_index, by = c("year" = "Year"))
-  message("Merged with Non-Durables Index.")
+  # Merge: 'year' in CEX matches 'Year' in CSV
+  # We intentionally keep ALL columns (including the ratio)
+  CEX <- left_join(CEX, price_data, by = c("year" = "Year"))
+  message("Merged annual price indices successfully.")
 } else {
-  warning("annual_nondurables_1980_2012.csv not found!")
+  warning("annual_price_indices.csv not found!")
 }
 
 # 3. Apply Filters
-# -------------------------------------------------------
 # We remove 'assets_0' from filters as it is not in the GMM equation
 CEX_Cleaned <- subset(
   CEX,
